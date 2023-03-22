@@ -1,0 +1,16 @@
+[package]
+name = "cube"
+version = "0.2.1"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+glium = "0.28.0"
+nalgebra = "0.25.3"
+glutin = "0.23.0"
+num-format = "0.4.4"
+termsize = "0.1.6"
+
+[profile.release]
+debug = 1
