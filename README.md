@@ -1,4 +1,4 @@
 # cube
 
-![cube](https://github.com/Trevrosa/cube/raw/main/src/cube.gif "cube")
+![cube](https://github.com/Trevrosa/cube/raw/master/src/cube.gif "cube")
 rotating cube
