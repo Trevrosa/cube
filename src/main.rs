@@ -229,9 +229,7 @@ fn main() {
                     }
                 };
 
-                let padding = {
-                    " ".repeat(cols - max_chars)
-                };
+                let padding = " ".repeat(cols - max_chars);
 
                 write!(lock, "{}{}", &chars_to_write[..max_chars], padding).unwrap();
 
