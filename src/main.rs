@@ -7,7 +7,7 @@ use glium::index::PrimitiveType;
 use glium::glutin::event_loop::*;
 use std::time::Instant;
 use glium::glutin::dpi::LogicalSize;
-use nalgebra::{Point3, Vector3};
+use nalgebra::{Point3, Vector3, Translation3};
 use glium::*;
 use num_format::{Locale, ToFormattedString};
 use std::io::{stdout, Write};
@@ -42,14 +42,14 @@ const FRAGMENT_SHADER_SRC: &str = r#"
 
 #[derive(Copy, Clone)]
 struct Vertex {
-    position: [f32; 3],
-    color: [f32; 3],
+    position: [f64; 3],
+    color: [f64; 3],
 }
 
 implement_vertex!(Vertex, position, color);
 
 struct Cube {
-    // vertices: Vec<Vertex>,
+    vertices: Vec<Vertex>,
     // indices: [u32; 36],
     vertex_buffer: glium::VertexBuffer<Vertex>,
     index_buffer: glium::IndexBuffer<u32>,
@@ -83,11 +83,20 @@ impl Cube {
         let index_buffer = glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &indices).unwrap();
         
         Self {
-            // vertices,
+            vertices,
             // indices,
             vertex_buffer,
             index_buffer,
         }
+    }
+
+    fn update_position(&mut self, display: Display, translation: Translation3<f64>) {
+        for vertex in &mut self.vertices {
+            let new_pos: Vector3<f64> = vertex.position.into();
+            vertex.position = [new_pos.x, new_pos.y, new_pos.z];
+        }
+        // Create a vertex buffer from the shape
+        self.vertex_buffer = VertexBuffer::new(&display, &self.vertices).unwrap();
     }
 
     fn draw(&self, target: &mut glium::Frame, program: &glium::Program, model_matrix: &nalgebra::Matrix4<f32>) {
@@ -201,13 +210,9 @@ fn main() {
                     (x, y) = (position.x, position.y);
 
                     if is_dragging {
-                        let dx = (x) as f32 / width as f32 * 2.0;
-                        let dy = (y) as f32 / height as f32 * 2.0;
-                        let translation_matrix =
-                            nalgebra::Matrix4::new_translation(&nalgebra::Vector3::new(
-                                 dx, dy, 0.0,
-                            ));
-                        model_matrix = translation_matrix * model_matrix;
+                        let new_center = Vector3::new(x, y, 0.0);
+                        cube.update_position(display, Translation3::from(new_center));
+                        // model_matrix = translation_matrix * model_matrix;
                     }
 
                     ControlFlow::Poll
