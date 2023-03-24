@@ -225,7 +225,6 @@ fn main() {
                     
                         // Create the vertex buffer object (VBO) for the modified vertices
                         cube.vertex_buffer.write(&modified_vertices);
-                        // cube.vertex_buffer = glium::VertexBuffer::new(&display, &modified_vertices).unwrap();
                     }
 
                     ControlFlow::Poll
