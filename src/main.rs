@@ -7,7 +7,7 @@ use glium::index::PrimitiveType;
 use glium::glutin::event_loop::*;
 use std::time::Instant;
 use glium::glutin::dpi::LogicalSize;
-use nalgebra::{Point3, Vector3, Translation3};
+use nalgebra::{Point3, Vector3, Matrix, U4, ArrayStorage, Matrix4};
 use glium::*;
 use num_format::{Locale, ToFormattedString};
 use std::io::{stdout, Write};
@@ -90,15 +90,6 @@ impl Cube {
         }
     }
 
-    fn update_position(&mut self, display: Display, translation: Translation3<f64>) {
-        for vertex in &mut self.vertices {
-            let new_pos: Vector3<f64> = vertex.position.into();
-            vertex.position = [new_pos.x, new_pos.y, new_pos.z];
-        }
-        // Create a vertex buffer from the shape
-        self.vertex_buffer = VertexBuffer::new(&display, &self.vertices).unwrap();
-    }
-
     fn draw(&self, target: &mut glium::Frame, program: &glium::Program, model_matrix: &nalgebra::Matrix4<f32>) {
         let (width, height) = target.get_dimensions();
         let aspect_ratio = height as f32 / width as f32;
@@ -157,7 +148,7 @@ fn main() {
             .unwrap();
 
     let cube = Cube::new(&display);
-    let mut model_matrix = nalgebra::Matrix4::identity();
+    let model_matrix = nalgebra::Matrix4::identity();
     let mut is_dragging = false;
 
     let start_time = Instant::now();
@@ -171,9 +162,9 @@ fn main() {
     }
     println!(", at {}x speed.\n", multiplier);
 
-    let mut new_draw = move || {
+    fn new_draw(multiplier: f32, start_time: Instant, mut model_matrix: Matrix<f32, U4, U4, ArrayStorage<f32, U4, U4>>, display: &Display, cube: &Cube, program: &Program) {
         let elapsed_time = start_time.elapsed().as_secs_f32() * multiplier;
-        model_matrix = nalgebra::Matrix4::new_rotation(nalgebra::Vector3::new(elapsed_time, elapsed_time, elapsed_time));
+        model_matrix = Matrix4::new_rotation(Vector3::new(elapsed_time, elapsed_time, elapsed_time));
 
         let mut target = display.draw();
 
@@ -183,7 +174,7 @@ fn main() {
         cube.draw(&mut target, &program, &model_matrix);
 
         target.finish().unwrap();
-    };
+    }
 
     let mut frames = 0;
     let mut lock = stdout().lock();
@@ -192,7 +183,7 @@ fn main() {
     let mut y = 0f64;
 
     events_loop.run(move |event, _, control_flow| {
-        new_draw();
+        new_draw(multiplier, start_time, model_matrix, &display, &cube, &program);
         frames += 1;
 
         *control_flow = match event {
@@ -210,9 +201,29 @@ fn main() {
                     (x, y) = (position.x, position.y);
 
                     if is_dragging {
-                        let new_center = Vector3::new(x, y, 0.0);
-                        cube.update_position(display, Translation3::from(new_center));
-                        // model_matrix = translation_matrix * model_matrix;
+                        let new_center = [x / width as f64, y / height as f64];
+
+                        // Calculate the offset from the old center to the new center
+                        let old_center = [0.0, 0.0];
+                        let offset = [
+                            new_center[0] - old_center[0],
+                            new_center[1] - old_center[1],
+                        ];
+                    
+                        // Modify the vertex positions relative to the new center position
+                        let mut modified_vertices = Vec::with_capacity(cube.vertices.len());
+                        for vertex in cube.vertices.iter() {
+                            let new_position = [
+                                vertex.position[0] + offset[0],
+                                vertex.position[1] + offset[1],
+                                vertex.position[2],
+                            ];
+                            modified_vertices.push(Vertex { position: new_position, color: vertex.color });
+                        }
+                    
+                        // Create the vertex buffer object (VBO) for the modified vertices
+                        cube.vertex_buffer.write(&modified_vertices);
+                        // cube.vertex_buffer = glium::VertexBuffer::new(&display, &modified_vertices).unwrap();
                     }
 
                     ControlFlow::Poll
