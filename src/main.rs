@@ -40,7 +40,7 @@ const FRAGMENT_SHADER_SRC: &str = r#"
     }
 "#;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct Vertex {
     position: [f64; 3],
     color: [f64; 3],
@@ -182,6 +182,8 @@ fn main() {
     let mut x = 0f64;
     let mut y = 0f64;
 
+    let mut modified_vertices = Vec::with_capacity(cube.vertices.len());
+
     events_loop.run(move |event, _, control_flow| {
         new_draw(multiplier, start_time, model_matrix, &display, &cube, &program);
         frames += 1;
@@ -204,14 +206,14 @@ fn main() {
                         let new_center = [x / width as f64, y / height as f64];
 
                         // Calculate the offset from the old center to the new center
-                        let old_center = [0.0, 0.0];
+                        let old_center = [0.25, 0.25];
                         let offset = [
                             new_center[0] - old_center[0],
                             new_center[1] - old_center[1],
                         ];
                     
                         // Modify the vertex positions relative to the new center position
-                        let mut modified_vertices = Vec::with_capacity(cube.vertices.len());
+                        modified_vertices.clear();
                         for vertex in cube.vertices.iter() {
                             let new_position = [
                                 vertex.position[0] + offset[0],
@@ -231,8 +233,8 @@ fn main() {
                 _ => ControlFlow::Poll
             },
             _ => { 
-                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}, matrix: {:?}", 
-                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, model_matrix.data).to_string();
+                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}, vertices: {:?}", 
+                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, modified_vertices).to_string();
 
                 let cols = termsize::get().unwrap().cols as usize;
                 
