@@ -121,6 +121,32 @@ impl Cube {
             .unwrap();
     }
 
+    fn get_center(&self) -> [f64; 2] {
+        let mut min_x = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+    
+        for vertex in self.vertices.iter() {
+            if vertex.position[0] < min_x {
+                min_x = vertex.position[0];
+            }
+            if vertex.position[0] > max_x {
+                max_x = vertex.position[0];
+            }
+            if vertex.position[1] < min_y {
+                min_y = vertex.position[1];
+            }
+            if vertex.position[1] > max_y {
+                max_y = vertex.position[1];
+            }
+        }
+    
+        let center = [(min_x + max_x) / 2.0, (min_y + max_y) / 2.0];
+
+        return center
+    }
+
     // fn get_vertices(&self) -> &Vec<Vertex> {
     //     &self.vertices
     // }
@@ -182,7 +208,7 @@ fn main() {
     let mut x = 0f64;
     let mut y = 0f64;
 
-    let mut modified_vertices = Vec::with_capacity(cube.vertices.len());
+    let mut new_vertices = Vec::new();
 
     events_loop.run(move |event, _, control_flow| {
         new_draw(multiplier, start_time, model_matrix, &display, &cube, &program);
@@ -203,28 +229,22 @@ fn main() {
                     (x, y) = (position.x, position.y);
 
                     if is_dragging {
-                        let new_center = [x / width as f64 * 2.0, y / height as f64 * 2.0];
+                        let new_center = [x / width as f64, y / height as f64, 0.0];
 
                         // Calculate the offset from the old center to the new center
-                        let old_center = [0.25, 0.25];
-                        let offset = [
-                            new_center[0] - old_center[0],
-                            new_center[1] - old_center[1],
-                        ];
+                        let center = cube.get_center();
                     
                         // Modify the vertex positions relative to the new center position
-                        modified_vertices.clear();
+                        let translation = [new_center[0] - center[0], new_center[1] - center[1], new_center[2] - center[2]];
+                    
+                        let mut new_vertices = Vec::new();
                         for vertex in cube.vertices.iter() {
-                            let new_position = [
-                                vertex.position[0] + offset[0],
-                                vertex.position[1] + offset[1],
-                                vertex.position[2],
-                            ];
-                            modified_vertices.push(Vertex { position: new_position, color: vertex.color });
+                            let new_position = [vertex.position[0] + translation[0], vertex.position[1] + translation[1], vertex.position[2] + translation[2]];
+                            new_vertices.push(Vertex { position: new_position, color: vertex.color });
                         }
                     
                         // Create the vertex buffer object (VBO) for the modified vertices
-                        cube.vertex_buffer.write(&modified_vertices);
+                        cube.vertex_buffer.write(&new_vertices);
                     }
 
                     ControlFlow::Poll
