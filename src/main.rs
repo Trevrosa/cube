@@ -203,7 +203,7 @@ fn main() {
                     (x, y) = (position.x, position.y);
 
                     if is_dragging {
-                        let new_center = [x / width as f64, y / height as f64];
+                        let new_center = [x / width as f64 * 2.0, y / height as f64 * 2.0];
 
                         // Calculate the offset from the old center to the new center
                         let old_center = [0.25, 0.25];
