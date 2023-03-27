@@ -129,9 +129,31 @@ impl Cube {
             .unwrap();
     }
 
-    // fn get_vertices(&self) -> &Vec<Vertex> {
-    //     &self.vertices
-    // }
+    fn get_center(&self) -> [f64; 2] {
+        let mut min_x = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+    
+        for vertex in self.vertices.iter() {
+            if vertex.position[0] < min_x {
+                min_x = vertex.position[0];
+            }
+            if vertex.position[0] > max_x {
+                max_x = vertex.position[0];
+            }
+            if vertex.position[1] < min_y {
+                min_y = vertex.position[1];
+            }
+            if vertex.position[1] > max_y {
+                max_y = vertex.position[1];
+            }
+        }
+    
+        let center = [(min_x + max_x) / 2.0, (min_y + max_y) / 2.0];
+
+        return center
+    }
 }
 
 #[allow(unused_assignments)]
@@ -189,7 +211,7 @@ fn main() {
     let mut x = 0f64;
     let mut y = 0f64;
 
-    let mut modified_vertices = Vec::with_capacity(cube.vertices.len());
+    let mut new_vertices: Vec<Vertex> = Vec::with_capacity(cube.vertices.capacity());
 
     events_loop.run(move |event, _, control_flow| {
         new_draw(multiplier, start_time, model_matrix, &display, &cube, &program);
@@ -212,26 +234,10 @@ fn main() {
                     if is_dragging {
                         let new_center = [x as f32 / width as f32, y as f32 / height as f32];
 
-                        // Calculate the offset from the old center to the new center
-                        let old_center = [0.25, 0.25];
-                        let offset = [
-                            new_center[0] - old_center[0],
-                            new_center[1] - old_center[1],
-                        ];
-                    
-                        // Modify the vertex positions relative to the new center position
-                        modified_vertices.clear();
-                        for vertex in cube.vertices.iter() {
-                            let new_position = [
-                                vertex.position[0] + offset[0],
-                                vertex.position[1] + offset[1],
-                                vertex.position[2],
-                            ];
-                            modified_vertices.push(Vertex { position: new_position, color: vertex.color });
-                        }
-                    
-                        // Create the vertex buffer object (VBO) for the modified vertices
-                        cube.vertex_buffer.write(&modified_vertices);
+                        new_vertices.clear();
+
+                        // Write the new vertices
+                        cube.vertex_buffer.write(&new_vertices);
                     }
 
                     ControlFlow::Poll
@@ -239,8 +245,8 @@ fn main() {
                 _ => ControlFlow::Poll
             },
             _ => { 
-                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}, vertices: {:?}", 
-                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, modified_vertices).to_string();
+                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}, center: {:?}", 
+                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, cube.get_center()).to_string();
 
                 let cols = termsize::get().unwrap().cols as usize;
                 
