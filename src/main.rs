@@ -7,7 +7,7 @@ use glium::index::PrimitiveType;
 use glium::glutin::event_loop::*;
 use std::time::Instant;
 use glium::glutin::dpi::LogicalSize;
-use nalgebra::{Point3, Vector3, Translation3, ArrayStorage, U4, Matrix};
+use nalgebra::{Point3, Vector3, Matrix, U4, ArrayStorage, Matrix4, Translation3};
 use glium::*;
 use num_format::{Locale, ToFormattedString};
 use std::io::{stdout, Write};
@@ -40,7 +40,7 @@ const FRAGMENT_SHADER_SRC: &str = r#"
     }
 "#;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct Vertex {
     position: [f32; 3],
     color: [f32; 3],
@@ -49,7 +49,7 @@ struct Vertex {
 implement_vertex!(Vertex, position, color);
 
 struct Cube {
-    // vertices: Vec<Vertex>,
+    vertices: Vec<Vertex>,
     // indices: [u32; 36],
     vertex_buffer: glium::VertexBuffer<Vertex>,
     index_buffer: glium::IndexBuffer<u32>,
@@ -85,7 +85,7 @@ impl Cube {
         let model_matrix = nalgebra::Matrix4::identity();
 
         Self {
-            // vertices,
+            vertices,
             // indices,
             model_matrix,
             vertex_buffer,
@@ -156,12 +156,13 @@ fn main() {
             .unwrap();
 
     let cube = Cube::new(&display);
+    let model_matrix = nalgebra::Matrix4::identity();
     let mut is_dragging = false;
 
     let start_time = Instant::now();
 
-    // let width: u32 = 800;
-    // let height: u32 = 600;
+    let width: u32 = 800;
+    let height: u32 = 600;
 
     let mut multiplier = 1.0;
     if args.len() > 2 {
@@ -169,9 +170,9 @@ fn main() {
     }
     println!(", at {}x speed.\n", multiplier);
 
-    fn new_draw(start_time: Instant, multiplier: f32, mut model_matrix: Matrix<f32, U4, U4, ArrayStorage<f32, U4, U4>>, display: &Display, cube: &Cube, program: &Program) {
+    fn new_draw(multiplier: f32, start_time: Instant, mut model_matrix: Matrix<f32, U4, U4, ArrayStorage<f32, U4, U4>>, display: &Display, cube: &Cube, program: &Program) {
         let elapsed_time = start_time.elapsed().as_secs_f32() * multiplier;
-        model_matrix = nalgebra::Matrix4::new_rotation(nalgebra::Vector3::new(elapsed_time, elapsed_time, elapsed_time));
+        model_matrix = Matrix4::new_rotation(Vector3::new(elapsed_time, elapsed_time, elapsed_time));
 
         let mut target = display.draw();
 
@@ -188,8 +189,10 @@ fn main() {
     let mut x = 0f64;
     let mut y = 0f64;
 
+    let mut modified_vertices = Vec::with_capacity(cube.vertices.len());
+
     events_loop.run(move |event, _, control_flow| {
-        new_draw(start_time, multiplier, cube.model_matrix, &display, &cube, &program);
+        new_draw(multiplier, start_time, model_matrix, &display, &cube, &program);
         frames += 1;
 
         *control_flow = match event {
@@ -207,9 +210,28 @@ fn main() {
                     (x, y) = (position.x, position.y);
 
                     if is_dragging {
-                        let new_center = Point3::new(x as f32, y as f32, 0.0);
-                        cube.update_position(new_center);
-                        // model_matrix = translation_matrix * model_matrix;
+                        let new_center = [x as f32 / width as f32, y as f32 / height as f32];
+
+                        // Calculate the offset from the old center to the new center
+                        let old_center = [0.25, 0.25];
+                        let offset = [
+                            new_center[0] - old_center[0],
+                            new_center[1] - old_center[1],
+                        ];
+                    
+                        // Modify the vertex positions relative to the new center position
+                        modified_vertices.clear();
+                        for vertex in cube.vertices.iter() {
+                            let new_position = [
+                                vertex.position[0] + offset[0],
+                                vertex.position[1] + offset[1],
+                                vertex.position[2],
+                            ];
+                            modified_vertices.push(Vertex { position: new_position, color: vertex.color });
+                        }
+                    
+                        // Create the vertex buffer object (VBO) for the modified vertices
+                        cube.vertex_buffer.write(&modified_vertices);
                     }
 
                     ControlFlow::Poll
@@ -217,8 +239,8 @@ fn main() {
                 _ => ControlFlow::Poll
             },
             _ => { 
-                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}, matrix: {:?}", 
-                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, cube.model_matrix.data).to_string();
+                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}, vertices: {:?}", 
+                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, modified_vertices).to_string();
 
                 let cols = termsize::get().unwrap().cols as usize;
                 
