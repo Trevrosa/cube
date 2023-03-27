@@ -7,7 +7,7 @@ use glium::index::PrimitiveType;
 use glium::glutin::event_loop::*;
 use std::time::Instant;
 use glium::glutin::dpi::LogicalSize;
-use nalgebra::{Point3, Vector3, Translation3};
+use nalgebra::{Point3, Vector3, Translation3, ArrayStorage, U4, Matrix};
 use glium::*;
 use num_format::{Locale, ToFormattedString};
 use std::io::{stdout, Write};
@@ -42,17 +42,18 @@ const FRAGMENT_SHADER_SRC: &str = r#"
 
 #[derive(Copy, Clone)]
 struct Vertex {
-    position: [f64; 3],
-    color: [f64; 3],
+    position: [f32; 3],
+    color: [f32; 3],
 }
 
 implement_vertex!(Vertex, position, color);
 
 struct Cube {
-    vertices: Vec<Vertex>,
+    // vertices: Vec<Vertex>,
     // indices: [u32; 36],
     vertex_buffer: glium::VertexBuffer<Vertex>,
     index_buffer: glium::IndexBuffer<u32>,
+    model_matrix: Matrix<f32, U4, U4, ArrayStorage<f32, U4, U4>>,
 }
 
 impl Cube {
@@ -81,22 +82,20 @@ impl Cube {
 
         let vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
         let index_buffer = glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &indices).unwrap();
-        
+        let model_matrix = nalgebra::Matrix4::identity();
+
         Self {
-            vertices,
+            // vertices,
             // indices,
+            model_matrix,
             vertex_buffer,
             index_buffer,
         }
     }
 
-    fn update_position(&mut self, display: Display, translation: Translation3<f64>) {
-        for vertex in &mut self.vertices {
-            let new_pos: Vector3<f64> = vertex.position.into();
-            vertex.position = [new_pos.x, new_pos.y, new_pos.z];
-        }
-        // Create a vertex buffer from the shape
-        self.vertex_buffer = VertexBuffer::new(&display, &self.vertices).unwrap();
+    fn update_position(mut self, center: Point3<f32>) {
+        let translation = Translation3::from(-center.coords);
+        self.model_matrix = translation.to_homogeneous() * self.model_matrix;
     }
 
     fn draw(&self, target: &mut glium::Frame, program: &glium::Program, model_matrix: &nalgebra::Matrix4<f32>) {
@@ -157,13 +156,12 @@ fn main() {
             .unwrap();
 
     let cube = Cube::new(&display);
-    let mut model_matrix = nalgebra::Matrix4::identity();
     let mut is_dragging = false;
 
     let start_time = Instant::now();
 
-    let width: u32 = 800;
-    let height: u32 = 600;
+    // let width: u32 = 800;
+    // let height: u32 = 600;
 
     let mut multiplier = 1.0;
     if args.len() > 2 {
@@ -171,7 +169,7 @@ fn main() {
     }
     println!(", at {}x speed.\n", multiplier);
 
-    let mut new_draw = move || {
+    fn new_draw(start_time: Instant, multiplier: f32, mut model_matrix: Matrix<f32, U4, U4, ArrayStorage<f32, U4, U4>>, display: &Display, cube: &Cube, program: &Program) {
         let elapsed_time = start_time.elapsed().as_secs_f32() * multiplier;
         model_matrix = nalgebra::Matrix4::new_rotation(nalgebra::Vector3::new(elapsed_time, elapsed_time, elapsed_time));
 
@@ -181,9 +179,8 @@ fn main() {
         target.clear_depth(1.0);
 
         cube.draw(&mut target, &program, &model_matrix);
-
         target.finish().unwrap();
-    };
+    }
 
     let mut frames = 0;
     let mut lock = stdout().lock();
@@ -192,7 +189,7 @@ fn main() {
     let mut y = 0f64;
 
     events_loop.run(move |event, _, control_flow| {
-        new_draw();
+        new_draw(start_time, multiplier, cube.model_matrix, &display, &cube, &program);
         frames += 1;
 
         *control_flow = match event {
@@ -210,8 +207,8 @@ fn main() {
                     (x, y) = (position.x, position.y);
 
                     if is_dragging {
-                        let new_center = Vector3::new(x, y, 0.0);
-                        cube.update_position(display, Translation3::from(new_center));
+                        let new_center = Point3::new(x as f32, y as f32, 0.0);
+                        cube.update_position(new_center);
                         // model_matrix = translation_matrix * model_matrix;
                     }
 
@@ -221,7 +218,7 @@ fn main() {
             },
             _ => { 
                 let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}, matrix: {:?}", 
-                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, model_matrix.data).to_string();
+                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, cube.model_matrix.data).to_string();
 
                 let cols = termsize::get().unwrap().cols as usize;
                 
