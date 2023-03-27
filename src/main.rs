@@ -146,10 +146,6 @@ impl Cube {
 
         return center
     }
-
-    // fn get_vertices(&self) -> &Vec<Vertex> {
-    //     &self.vertices
-    // }
 }
 
 #[allow(unused_assignments)]
@@ -208,7 +204,7 @@ fn main() {
     let mut x = 0f64;
     let mut y = 0f64;
 
-    let mut new_vertices = Vec::new();
+    let mut new_vertices: Vec<Vertex> = Vec::with_capacity(cube.vertices.capacity());
 
     events_loop.run(move |event, _, control_flow| {
         new_draw(multiplier, start_time, model_matrix, &display, &cube, &program);
@@ -229,21 +225,11 @@ fn main() {
                     (x, y) = (position.x, position.y);
 
                     if is_dragging {
-                        let new_center = [x / width as f64, y / height as f64, 0.0];
+                        let new_center = [x / width as f64, y / height as f64];
 
-                        // Calculate the offset from the old center to the new center
-                        let center = cube.get_center();
-                    
-                        // Modify the vertex positions relative to the new center position
-                        let translation = [new_center[0] - center[0], new_center[1] - center[1], new_center[2] - center[2]];
-                    
-                        let mut new_vertices = Vec::new();
-                        for vertex in cube.vertices.iter() {
-                            let new_position = [vertex.position[0] + translation[0], vertex.position[1] + translation[1], vertex.position[2] + translation[2]];
-                            new_vertices.push(Vertex { position: new_position, color: vertex.color });
-                        }
-                    
-                        // Create the vertex buffer object (VBO) for the modified vertices
+                        new_vertices.clear();
+
+                        // Write the new vertices
                         cube.vertex_buffer.write(&new_vertices);
                     }
 
@@ -252,8 +238,8 @@ fn main() {
                 _ => ControlFlow::Poll
             },
             _ => { 
-                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}, vertices: {:?}", 
-                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, modified_vertices).to_string();
+                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}, center: {:?}", 
+                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, cube.get_center()).to_string();
 
                 let cols = termsize::get().unwrap().cols as usize;
                 
