@@ -85,7 +85,7 @@ impl Cube {
 
         let vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
         let index_buffer = glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &indices).unwrap();
-        let model_matrix = nalgebra::Matrix4::identity();
+        let model_matrix = Matrix4::identity();
 
         Self {
             vertices,
@@ -127,8 +127,7 @@ impl Cube {
     }
 
     fn set_position(&mut self, x: f32, y: f32, z: f32) {
-        let translation = Matrix4::new_translation(&nalgebra::Vector3::new(x, y, z));
-        self.model_matrix = translation;
+        self.model_matrix = Matrix4::new_translation(&Vector3::new(x, y, z));
     }
 }
 
@@ -139,11 +138,11 @@ fn main() {
     let window = WindowBuilder::new()
         .with_title("Rotating Cube")
         .with_inner_size(LogicalSize { width, height });
-    let args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = std::env::args().collect::<Vec<String>>()[1..].to_vec();
 
     let mut samples: u16 = 0;
-    if args.len() > 1 {
-        samples = args[1].parse().unwrap_or(0);
+    if args.len() > 0 {
+        samples = args[0].parse().unwrap_or(0);
     }
     print!("running {}x AA", samples);
     
@@ -159,12 +158,11 @@ fn main() {
     let start_time = Instant::now();
     
     let mut multiplier: f32 = 1.0;
-    if args.len() > 2 {
-        multiplier = args[2].parse().unwrap_or(1.0);
+    if args.len() > 1 {
+        multiplier = args[1].parse().unwrap_or(1.0);
     }
     println!(", at {}x speed.\n", multiplier);
 
-    #[allow(unused_assignments)]
     fn new_draw(multiplier: f32, start_time: Instant, display: &Display, cube: &mut RefMut<'_, Cube>, program: &Program) {
         let elapsed_time = start_time.elapsed().as_secs_f32() * multiplier;
         cube.model_matrix = Matrix4::new_rotation(Vector3::new(elapsed_time, elapsed_time, elapsed_time));
