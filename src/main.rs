@@ -125,6 +125,11 @@ impl Cube {
             )
             .unwrap();
     }
+
+    fn set_position(&mut self, x: f32, y: f32, z: f32) {
+        let translation = Matrix4::new_translation(&nalgebra::Vector3::new(x, y, z));
+        self.model_matrix = translation;
+    }
 }
 
 fn main() {
@@ -160,7 +165,7 @@ fn main() {
     println!(", at {}x speed.\n", multiplier);
 
     #[allow(unused_assignments)]
-    fn new_draw(multiplier: f32, start_time: Instant, display: &Display, mut cube: RefMut<Cube>, program: &Program) {
+    fn new_draw(multiplier: f32, start_time: Instant, display: &Display, cube: &mut RefMut<'_, Cube>, program: &Program) {
         let elapsed_time = start_time.elapsed().as_secs_f32() * multiplier;
         cube.model_matrix = Matrix4::new_rotation(Vector3::new(elapsed_time, elapsed_time, elapsed_time));
 
@@ -180,8 +185,8 @@ fn main() {
     let mut x: f64 = 0.0;
 
     event_loop.run(move |event, _, control_flow| {
-        let cube_ref = cube.borrow_mut();
-        new_draw(multiplier, start_time, &display, cube_ref, &program);
+        let mut cube_ref = cube.borrow_mut();
+        new_draw(multiplier, start_time, &display, &mut cube_ref, &program);
         frames += 1;
 
         *control_flow = match event {
@@ -197,13 +202,18 @@ fn main() {
                 }
                 WindowEvent::CursorMoved { position, .. } => {
                     (x, y) = position.into();
+
+                    if is_dragging {
+                        cube_ref.set_position(x as f32, y as f32, 1.0);
+                    }
+
                     ControlFlow::Poll
                 }
                 _ => ControlFlow::Poll
             },
             _ => { 
-                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}", 
-                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging).to_string();
+                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}, position: {:?}", 
+                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, &cube_ref.model_matrix.data).to_string();
 
                 let cols = termsize::get().unwrap().cols as usize;
                 
