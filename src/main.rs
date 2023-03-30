@@ -12,7 +12,7 @@ use glium::glutin::dpi::LogicalSize;
 use nalgebra::{Point3, Vector3, Matrix, U4, ArrayStorage, Matrix4};//, Translation3};
 use glium::*;
 use num_format::{Locale, ToFormattedString};
-use std::io::{stdout, Write};
+use std::io::{stdout, Write, StdoutLock};
 
 
 const VERTEX_SHADER_SRC: &str = r#"
@@ -131,6 +131,23 @@ impl Cube {
     }
 }
 
+fn write_with_padding(lock: &mut StdoutLock, chars_to_write: String) {
+    let cols = termsize::get().unwrap().cols as usize;
+    
+    let max_chars = {
+        if chars_to_write.len() > cols.into() {
+            cols
+        }
+        else {
+            chars_to_write.len()
+        }
+    };
+
+    let padding = " ".repeat(cols - max_chars);
+
+    write!(lock, "{}{}", &chars_to_write[..max_chars], padding).unwrap();
+}
+
 fn main() {
     let event_loop = EventLoop::new();
     let width = 800;
@@ -209,24 +226,12 @@ fn main() {
                 }
                 _ => ControlFlow::Poll
             },
-            _ => { 
-                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}, position: {:?}", 
-                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging, &cube_ref.model_matrix.data).to_string();
+            _ => {
+                let fps = (frames as f32 / start_time.elapsed().as_secs_f32()) as u32;
+                let chars_to_write = format!("\rframe: {} ({} fps), mouse: ({}, {}), dragging? {}", 
+                    frames.to_formatted_string(&Locale::en), fps.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging).to_string();
 
-                let cols = termsize::get().unwrap().cols as usize;
-                
-                let max_chars = {
-                    if chars_to_write.len() > cols.into() {
-                        cols
-                    }
-                    else {
-                        chars_to_write.len()
-                    }
-                };
-
-                let padding = " ".repeat(cols - max_chars);
-
-                write!(lock, "{}{}", &chars_to_write[..max_chars], padding).unwrap();
+                write_with_padding(&mut lock, chars_to_write);
 
                 ControlFlow::Poll
             }
