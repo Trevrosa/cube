@@ -12,7 +12,7 @@ use glium::glutin::dpi::LogicalSize;
 use nalgebra::{Point3, Vector3, Matrix, U4, ArrayStorage, Matrix4};//, Translation3};
 use glium::*;
 use num_format::{Locale, ToFormattedString};
-use std::io::{stdout, Write};
+use std::io::{stdout, Write, StdoutLock};
 
 
 const VERTEX_SHADER_SRC: &str = r#"
@@ -85,7 +85,7 @@ impl Cube {
 
         let vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
         let index_buffer = glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, &indices).unwrap();
-        let model_matrix = nalgebra::Matrix4::identity();
+        let model_matrix = Matrix4::identity();
 
         Self {
             vertices,
@@ -125,6 +125,27 @@ impl Cube {
             )
             .unwrap();
     }
+
+    fn set_position(&mut self, x: f32, y: f32, z: f32) {
+        self.model_matrix = Matrix4::new_translation(&Vector3::new(x, y, z));
+    }
+}
+
+fn write_with_padding(lock: &mut StdoutLock, chars_to_write: String) {
+    let cols = termsize::get().unwrap().cols as usize;
+    
+    let max_chars = {
+        if chars_to_write.len() > cols.into() {
+            cols
+        }
+        else {
+            chars_to_write.len()
+        }
+    };
+
+    let padding = " ".repeat(cols - max_chars);
+
+    write!(lock, "{}{}", &chars_to_write[..max_chars], padding).unwrap();
 }
 
 fn main() {
@@ -134,11 +155,11 @@ fn main() {
     let window = WindowBuilder::new()
         .with_title("Rotating Cube")
         .with_inner_size(LogicalSize { width, height });
-    let args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = std::env::args().collect::<Vec<String>>()[1..].to_vec();
 
     let mut samples: u16 = 0;
-    if args.len() > 1 {
-        samples = args[1].parse().unwrap_or(0);
+    if args.len() > 0 {
+        samples = args[0].parse().unwrap_or(0);
     }
     print!("running {}x AA", samples);
     
@@ -154,13 +175,12 @@ fn main() {
     let start_time = Instant::now();
     
     let mut multiplier: f32 = 1.0;
-    if args.len() > 2 {
-        multiplier = args[2].parse().unwrap_or(1.0);
+    if args.len() > 1 {
+        multiplier = args[1].parse().unwrap_or(1.0);
     }
     println!(", at {}x speed.\n", multiplier);
 
-    #[allow(unused_assignments)]
-    fn new_draw(multiplier: f32, start_time: Instant, display: &Display, mut cube: RefMut<Cube>, program: &Program) {
+    fn new_draw(multiplier: f32, start_time: Instant, display: &Display, cube: &mut RefMut<'_, Cube>, program: &Program) {
         let elapsed_time = start_time.elapsed().as_secs_f32() * multiplier;
         cube.model_matrix = Matrix4::new_rotation(Vector3::new(elapsed_time, elapsed_time, elapsed_time));
 
@@ -180,8 +200,8 @@ fn main() {
     let mut x: f64 = 0.0;
 
     event_loop.run(move |event, _, control_flow| {
-        let cube_ref = cube.borrow_mut();
-        new_draw(multiplier, start_time, &display, cube_ref, &program);
+        let mut cube_ref = cube.borrow_mut();
+        new_draw(multiplier, start_time, &display, &mut cube_ref, &program);
         frames += 1;
 
         *control_flow = match event {
@@ -197,28 +217,21 @@ fn main() {
                 }
                 WindowEvent::CursorMoved { position, .. } => {
                     (x, y) = position.into();
+
+                    if is_dragging {
+                        cube_ref.set_position(x as f32, y as f32, 1.0);
+                    }
+
                     ControlFlow::Poll
                 }
                 _ => ControlFlow::Poll
             },
-            _ => { 
-                let chars_to_write = format!("\rframe: {}, mouse: ({}, {}), dragging? {}", 
-                    frames.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging).to_string();
+            _ => {
+                let fps = (frames as f32 / start_time.elapsed().as_secs_f32()) as u32;
+                let chars_to_write = format!("\rframe: {} ({} fps), mouse: ({}, {}), dragging? {}", 
+                    frames.to_formatted_string(&Locale::en), fps.to_formatted_string(&Locale::en), x.round(), y.round(), is_dragging).to_string();
 
-                let cols = termsize::get().unwrap().cols as usize;
-                
-                let max_chars = {
-                    if chars_to_write.len() > cols.into() {
-                        cols
-                    }
-                    else {
-                        chars_to_write.len()
-                    }
-                };
-
-                let padding = " ".repeat(cols - max_chars);
-
-                write!(lock, "{}{}", &chars_to_write[..max_chars], padding).unwrap();
+                write_with_padding(&mut lock, chars_to_write);
 
                 ControlFlow::Poll
             }
